@@ -1,24 +1,60 @@
-# This is a template for a Python scraper on morph.io (https://morph.io)
-# including some code snippets below that you should find helpful
+import json, csv, requests, requests_cache, sqlite3, dateutil.parser
 
-# import scraperwiki
-# import lxml.html
-#
-# # Read in a page
-# html = scraperwiki.scrape("http://foo.com")
-#
-# # Find something on the page using css selectors
-# root = lxml.html.fromstring(html)
-# root.cssselect("div[align='left']")
-#
-# # Write out to the sqlite database using scraperwiki library
-# scraperwiki.sqlite.save(unique_keys=['name'], data={"name": "susan", "occupation": "software developer"})
-#
-# # An arbitrary query against the database
-# scraperwiki.sql.select("* from data where 'name'='peter'")
+DB_FILE = 'data.sqlite'
+conn = sqlite3.connect(DB_FILE)
+c = conn.cursor()
 
-# You don't have to do things with the ScraperWiki and lxml libraries.
-# You can use whatever libraries you want: https://morph.io/documentation/python
-# All that matters is that your final data is written to an SQLite database
-# called "data.sqlite" in the current working directory which has at least a table
-# called "data".
+c.execute("DROP TABLE IF EXISTS data")
+c.execute("CREATE TABLE IF NOT EXISTS data (album,year,artist,rating_avg,count,item_id)")
+
+req = requests.Session()
+requests_cache.install_cache('allmusic')
+
+headers = {'referer':'http://www.allmusic.com/advanced-search','user-agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.59 Safari/537.36'}
+payload = {'filters[]': 'editorialrating:9', 'sort': ''}
+
+link = 'http://www.allmusic.com/advanced-search/results/{0}'
+rating_link = 'http://www.allmusic.com/rating/average/{0}'
+
+page_no = 101
+while True: #uhh
+    print('page no',page_no)
+    site = req.post(link.format(str(page_no) if page_no>0 else ''),data=payload,headers=headers).text
+
+    with open('test.html','w') as file:
+        file.write(site)
+    
+    if 'desktop-results' not in site:
+        print('nothing for page number',page_no)
+        break
+    if 'http://www.allmusic.com/album/' not in site:
+        print('nothing for page number',page_no)
+        break
+    page_no += 1
+
+    table = site.split('<tbody>')[1].split('</tbody>')[0]
+    
+    for row in table.split('<tr>')[1:]:
+        album = row.split('title="')[1].split('">',1)[0]
+        year = row.split('class="year">')[1].split('</td',1)[0].strip()
+        
+        artist = row.split('artist">')[1].split('</td',1)[0].strip()
+        if 'href=' in artist:
+            artist = artist.split('">',1)[1].split('</a',1)[0]
+        
+        item_id = row.split('<a href="/album/',1)[1].split('"',1)[0].split('-')[-1]
+
+        rating_data = json.loads(req.get(rating_link.format(item_id.upper()),headers=headers).text)
+        try:
+            rating_avg = rating_data[0]['average']
+        except:
+            print(album,item_id,rating_data)
+        count = rating_data[0]['count']
+        item_id = rating_data[0]['itemId']
+
+        #album,year,artist,rating_avg,count,item_id)
+        c.execute('INSERT INTO data VALUES(?,?,?,?,?,?)',[album,year,artist,rating_avg,count,item_id])
+    
+    print('Done')
+    conn.commit()
+c.close()
