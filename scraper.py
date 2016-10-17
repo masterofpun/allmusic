@@ -16,7 +16,7 @@ payload = {'filters[]': 'editorialrating:9', 'sort': ''}
 link = 'http://www.allmusic.com/advanced-search/results/{0}'
 rating_link = 'http://www.allmusic.com/rating/average/{0}'
 
-page_no = 101
+page_no = 0
 while True: #uhh
     print('page no',page_no)
     site = req.post(link.format(str(page_no) if page_no>0 else ''),data=payload,headers=headers).text
