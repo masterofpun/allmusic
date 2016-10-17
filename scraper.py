@@ -5,7 +5,7 @@ conn = sqlite3.connect(DB_FILE)
 c = conn.cursor()
 
 c.execute("DROP TABLE IF EXISTS data")
-c.execute("CREATE TABLE IF NOT EXISTS data (album,year,artist,rating_avg,count,item_id)")
+c.execute("CREATE TABLE IF NOT EXISTS data (album,year,artist,rating_avg,count,item_id UNIQUE)")
 
 req = requests.Session()
 requests_cache.install_cache('allmusic')
@@ -21,8 +21,8 @@ while True: #uhh
     print('page no',page_no)
     site = req.post(link.format(str(page_no) if page_no>0 else ''),data=payload,headers=headers).text
 
-    with open('test.html','w') as file:
-        file.write(site)
+    #with open('test.html','w') as file:
+    #    file.write(site)
     
     if 'desktop-results' not in site:
         print('nothing for page number',page_no)
@@ -35,14 +35,15 @@ while True: #uhh
     table = site.split('<tbody>')[1].split('</tbody>')[0]
     
     for row in table.split('<tr>')[1:]:
-        album = row.split('title="')[1].split('">',1)[0]
+        album = row.split('"title">',1)[1].split('">',1)[1].split('</a',1)[0]
+        
         year = row.split('class="year">')[1].split('</td',1)[0].strip()
         
         artist = row.split('artist">')[1].split('</td',1)[0].strip()
         if 'href=' in artist:
             artist = artist.split('">',1)[1].split('</a',1)[0]
         
-        item_id = row.split('<a href="/album/',1)[1].split('"',1)[0].split('-')[-1]
+        item_id = row.split('/album/',1)[1].split('"',1)[0].split('-')[-1]
 
         rating_data = json.loads(req.get(rating_link.format(item_id.upper()),headers=headers).text)
         try:
@@ -51,10 +52,10 @@ while True: #uhh
             print(album,item_id,rating_data)
         count = rating_data[0]['count']
         item_id = rating_data[0]['itemId']
-
+        print(album,item_id,rating_data)
         #album,year,artist,rating_avg,count,item_id)
-        c.execute('INSERT INTO data VALUES(?,?,?,?,?,?)',[album,year,artist,rating_avg,count,item_id])
-    
+        c.execute('INSERT OR REPLACE INTO data VALUES(?,?,?,?,?,?)',[album,year,artist,rating_avg,count,item_id])
+        
     print('Done')
     conn.commit()
 c.close()
