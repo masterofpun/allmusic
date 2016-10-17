@@ -46,13 +46,11 @@ while True: #uhh
         item_id = row.split('/album/',1)[1].split('"',1)[0].split('-')[-1]
 
         rating_data = json.loads(req.get(rating_link.format(item_id.upper()),headers=headers).text)
-        try:
-            rating_avg = rating_data[0]['average']
-        except:
-            print(album,item_id,rating_data)
+        rating_avg = rating_data[0]['average']
+
         count = rating_data[0]['count']
         item_id = rating_data[0]['itemId']
-        print(album,item_id,rating_data)
+        #print(album,item_id,rating_data)
         #album,year,artist,rating_avg,count,item_id)
         c.execute('INSERT OR REPLACE INTO data VALUES(?,?,?,?,?,?)',[album,year,artist,rating_avg,count,item_id])
         
